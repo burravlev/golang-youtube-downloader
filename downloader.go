@@ -1,3 +1,3 @@
-package ytdl
+package youtube
 
 type Client struct{}

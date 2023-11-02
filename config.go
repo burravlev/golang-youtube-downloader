@@ -1,4 +1,4 @@
-package ytdl
+package youtube
 
 type Config struct {
 }
