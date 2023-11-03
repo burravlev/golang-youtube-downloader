@@ -14,7 +14,7 @@ const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 
 var client = &http.Client{}
 
-type Clients struct {
+type Client struct {
 }
 
 func (Client) GetVideo(videoId string) (*VideoInfo, error) {
@@ -31,7 +31,7 @@ func (Client) GetVideo(videoId string) (*VideoInfo, error) {
 			}
 		}
 	}`
-	data := []byte(fmt.Sprintf(body, "auD_fT0KCQg"))
+	data := []byte(fmt.Sprintf(body, videoId))
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
