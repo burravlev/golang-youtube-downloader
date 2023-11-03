@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
@@ -15,11 +17,7 @@ var client = &http.Client{}
 type Clients struct {
 }
 
-func (Client) GetVideo(url string) (*VideoInfo, error) {
-	return parse(url)
-}
-
-func parse(videoId string) (*VideoInfo, error) {
+func (Client) GetVideo(videoId string) (*VideoInfo, error) {
 	url := "https://youtubei.googleapis.com/youtubei/v1/player?key=" + API_KEY
 	body := `{
 		"videoId" : "%s",
@@ -33,11 +31,7 @@ func parse(videoId string) (*VideoInfo, error) {
 			}
 		}
 	}`
-	return request(url, "POST", fmt.Sprintf(body, "bZYNGlum3NE"))
-}
-
-func request(url, method, body string) (*VideoInfo, error) {
-	data := []byte(body)
+	data := []byte(fmt.Sprintf(body, "auD_fT0KCQg"))
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
@@ -56,25 +50,48 @@ func request(url, method, body string) (*VideoInfo, error) {
 }
 
 type writeCounter struct {
-	total uint64
+	percen   int
+	loaded   int64
+	total    int64
+	callback func(int)
 }
 
 func (wc *writeCounter) Write(b []byte) (int, error) {
-
+	wc.loaded += int64(len(b))
+	if current := int(wc.loaded * 100 / wc.total); current > wc.percen {
+		wc.percen = current
+		wc.callback(wc.percen)
+	}
+	return len(b), nil
 }
 
-func (Client) Download(format *Format, filepath string, callback YtCallback) {
-	file, err := os.Create(filepath)
+func (Client) Download(request Request) (*os.File, error) {
+	file, err := os.Create(request.Filepath)
 	if err != nil {
-		callback.OnError(err)
-		return
+		return nil, err
 	}
 	defer file.Close()
-	callback.OnFinished(file)
-	response, err := http.Get(format.URL)
+	response, err := http.Get(request.Format.URL)
 	if err != nil {
-		callback.OnError(err)
-		return
+		return nil, err
 	}
 	defer response.Body.Close()
+	contentLength, err := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if request.Callback != nil {
+		wr := &writeCounter{
+			percen:   0,
+			loaded:   0,
+			total:    contentLength,
+			callback: request.Callback,
+		}
+		if _, err := io.Copy(file, io.TeeReader(response.Body, wr)); err != nil {
+			return nil, err
+		}
+		return file, nil
+	}
+	_, err = io.Copy(file, response.Body)
+	return file, err
 }
